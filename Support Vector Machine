@@ -1,0 +1,114 @@
+import zipfile
+import os
+
+# Define paths to the inner zip files
+train_zip_path = 'C:/Users/shubh/Downloads/dataset/train.zip'
+test_zip_path = 'C:/Users/shubh/Downloads/dataset/test1.zip'
+
+# Define extraction directories
+train_extraction_dir = 'C:/Users/shubh/Downloads/dataset/train/'
+test_extraction_dir = 'C:/Users/shubh/Downloads/dataset/test/'
+
+# Extract train.zip
+with zipfile.ZipFile(train_zip_path, 'r') as zip_ref:
+    zip_ref.extractall(train_extraction_dir)
+
+# Extract test1.zip
+with zipfile.ZipFile(test_zip_path, 'r') as zip_ref:
+    zip_ref.extractall(test_extraction_dir)
+
+# List the extracted files and directories
+for root, dirs, files in os.walk(train_extraction_dir):
+    print(root, dirs, files)
+for root, dirs, files in os.walk(test_extraction_dir):
+    print(root, dirs, files)
+import numpy as np
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+
+def load_images_from_folder(folder):
+    images = []
+    labels = []
+    for root, _, files in os.walk(folder):
+        for filename in files:
+            if filename.endswith('.jpg') or filename.endswith('.png'):
+                img_path = os.path.join(root, filename)
+                img = load_img(img_path, target_size=(128, 128))
+                if img is not None:
+                    images.append(img_to_array(img))
+                    if 'cat' in filename:
+                        labels.append(0)
+                    elif 'dog' in filename:
+                        labels.append(1)
+    return np.array(images), np.array(labels)
+
+# Load train data
+X_train, y_train = load_images_from_folder(train_extraction_dir)
+
+if X_train.size == 0 or y_train.size == 0:
+    print("No images found in the train directory. Please check the directory structure.")
+else:
+    # Normalize the pixel values
+    X_train = X_train / 255.0
+
+    # Split into train and validation sets
+    from sklearn.model_selection import train_test_split
+    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
+from tensorflow.keras.applications.vgg16 import VGG16, preprocess_input
+
+if X_train.size > 0 and y_train.size > 0:
+    # Load the VGG16 model
+    vgg_model = VGG16(weights='imagenet', include_top=False, input_shape=(128, 128, 3))
+
+    # Extract features for the training set
+    X_train_features = vgg_model.predict(preprocess_input(X_train))
+    X_val_features = vgg_model.predict(preprocess_input(X_val))
+
+    # Flatten the features
+    X_train_features = X_train_features.reshape(X_train_features.shape[0], -1)
+    X_val_features = X_val_features.reshape(X_val_features.shape[0], -1)
+if X_train.size > 0 and y_train.size > 0:
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.svm import SVC
+    from sklearn.metrics import accuracy_score, classification_report
+
+    # Create an SVM model
+    svm_model = make_pipeline(StandardScaler(), SVC(kernel='linear', probability=True))
+
+    # Train the SVM model
+    svm_model.fit(X_train_features, y_train)
+
+    # Predict on the validation set
+    y_val_pred = svm_model.predict(X_val_features)
+
+    # Evaluate the model
+    accuracy = accuracy_score(y_val, y_val_pred)
+    print(f'Validation Accuracy: {accuracy:.4f}')
+    print(classification_report(y_val, y_val_pred))
+def load_test_images_from_folder(folder, submission_df):
+    images = []
+    ids = submission_df['Id'].values
+    for img_id in ids:
+        img_name = f'{img_id}.jpg'
+        img_path = os.path.join(folder, img_name)
+        img = load_img(img_path, target_size=(128, 128))
+        if img is not None:
+            images.append(img_to_array(img))
+    return np.array(images)
+
+if X_train.size > 0 and y_train.size > 0:
+    # Load test data
+    sample_submission = pd.read_csv('C:/Users/shubh/Downloads/dataset/sampleSubmission.csv')
+    test_images = load_test_images_from_folder(test_extraction_dir, sample_submission)
+    test_images = test_images / 255.0
+
+    # Extract features for the test set
+    test_features = vgg_model.predict(preprocess_input(test_images))
+    test_features = test_features.reshape(test_features.shape[0], -1)
+
+    # Predict on the test set
+    test_predictions = svm_model.predict(test_features)
+
+    # Prepare submission file
+    sample_submission['Label'] = test_predictions
+    sample_submission.to_csv('C:/Users/shubh/Downloads/sampleSubmission.csv', index=False)
