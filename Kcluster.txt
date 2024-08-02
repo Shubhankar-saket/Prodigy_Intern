@@ -1,0 +1,35 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.cluster import KMeans
+
+# Load the dataset
+df = pd.read_csv('Mall_Customers.csv')
+# Select features for clustering
+X = df[['Annual Income (k$)', 'Spending Score (1-100)']]
+
+# Standardize the data (optional, but recommended for K-means)
+from sklearn.preprocessing import StandardScaler
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+# Select features for clustering
+X = df[['Annual Income (k$)', 'Spending Score (1-100)']]
+
+# Standardize the data (optional, but recommended for K-means)
+from sklearn.preprocessing import StandardScaler
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+kmeans = KMeans(n_clusters=5, init='k-means++', max_iter=300, n_init=10, random_state=0)
+y_kmeans = kmeans.fit_predict(X_scaled)
+
+# Add the cluster labels to the original dataframe
+df['Cluster'] = y_kmeans
+# Visualize the clusters
+plt.figure(figsize=(10, 5))
+sns.scatterplot(x='Annual Income (k$)', y='Spending Score (1-100)', hue='Cluster', data=df, palette='viridis')
+plt.title('Clusters of Customers')
+plt.xlabel('Annual Income (k$)')
+plt.ylabel('Spending Score (1-100)')
+plt.legend()
+plt.show()
